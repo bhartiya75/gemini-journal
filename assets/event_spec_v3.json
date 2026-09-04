@@ -1,0 +1,26 @@
+{
+  "banner": "Google Cloud × Hack2skill · Ideathon 2026",
+  "kicker": "",
+  "headline": ["Gen AI Academy", "APAC Edition — Cohort 3"],
+  "sub": "Learn · Challenge · Build  —  July to September 2026, hybrid, free",
+  "rows": [
+    ["Academy", "Cloud Run track: workshop, codelab, quiz.", "Mandatory quiz + Track 3 — 10/10, graduated 30 Aug."],
+    ["Ideathon", "Capstone: ship a production-grade AI app.", "Firebase Auth · Gemini · Firestore · Secret Manager · Cloud Run."],
+    ["Outcome", "Personal Gemini Journal, live on Cloud Run.", "Reflections — recurring themes · mood trend · one insight."]
+  ],
+  "panel": {
+    "kicker": "The brief's best line",
+    "big": "Security constitution first. Code second.",
+    "lines": ["Make AI Studio think like a security engineer",
+              "before it writes a single line."]
+  },
+  "closing": {
+    "label": "Why it mattered",
+    "lines": ["Most AI demos die when", "the second user arrives."]
+  },
+  "footer": {
+    "left": "From Academy to Ideathon  ·  #AccelerateAIwithCloudRun",
+    "sub": "Full STAR write-up: link in the first comment",
+    "right": "linkedin.com/in/bshekhar"
+  }
+}
