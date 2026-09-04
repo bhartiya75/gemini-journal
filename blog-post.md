@@ -1,89 +1,98 @@
-# I asked AI Studio to think like a security engineer — then built a journal that reads you back to yourself
+# From Academy to Ideathon: Building a Secure Personal Gemini Journal on Google Cloud
 
-*Built for the Google Cloud Gen AI Academy APAC Ideathon · #AccelerateAIwithCloudRun*
+I had the privilege of participating in the **Google Cloud Gen AI Academy —
+APAC Edition (Cohort 3)**, a challenge-based program run by Google Cloud with
+Hack2skill. After completing the Academy phase — the Cloud Run track,
+codelabs, and quizzes — I took on its capstone: the **Ideathon Challenge**.
 
-Most AI demos die the moment a second user shows up. Hardcoded keys, no auth
-boundary, one shared database. The Ideathon challenge was refreshingly blunt
-about this: configure Google AI Studio with a security "constitution" *before
-writing any code*, then ship something production-grade.
+Here is that journey, in STAR form.
 
-So I built the **Personal Gemini Journal** — and its favorite trick is called
-Reflections.
+## ⭐ Situation
 
-**Live app:** https://gemini-journal-716080261877.us-east1.run.app
-**Code:** https://github.com/bhartiya75/gemini-journal
+The Ideathon brief was refreshingly honest about a real industry problem:
+most AI-generated apps look great in a demo and fall apart in production —
+hardcoded API keys, no authentication boundaries, one shared database with
+zero isolation between users.
 
-## What it does
+The challenge: configure **Google AI Studio to think like a security
+engineer before writing a single line of code**, then use it to ship a real,
+production-grade application — the *Personal Gemini Journal*.
 
-You sign in, and talk through your day with Gemini — a warm, short-form
-journaling companion that asks one good follow-up question at a time. When
-you're done, one click on **Save entry** has Gemini distill the conversation
-into a structured journal entry: a 2–3 sentence summary, a one-word mood, and
-theme tags. Your raw chat is cleared; the distilled entry persists.
+## 🎯 Task
 
-*(screenshot: chat + saved entries)*
+Build an authenticated journaling web app where users sign in, brainstorm or
+journal with Gemini, and have conversations automatically summarized and
+saved — meeting four non-negotiable requirements:
 
-## The unique feature: 🪞 Reflections
+1. **User authentication** via Firebase
+2. **Multi-turn AI interaction** with the Gemini API
+3. **User-isolated data storage** in Cloud Firestore — zero cross-user leakage
+4. **Secure key management** via Google Cloud Secret Manager — never hardcoded
 
-Journals store your words. Reflections reads them back to you. It analyzes
-your recent entries and returns:
+…deployed on **Cloud Run**, plus at least **one original feature** beyond the
+base spec.
 
-- the **3 most recurring themes**, each with a reason,
-- a one-line **mood trend** across time,
-- one specific, caring **insight** you probably hadn't noticed.
+## 🔨 Action
 
-In my test data it caught something real: *"periods of relief are brief
-before new pressures emerge — you may not be allowing full recovery."* That's
-the kind of thing a good friend notices.
+**Phase 1 — the constitution.** Before any code, I wrote security custom
+instructions for AI Studio: assume hostile browsers, ID-guessing users,
+public source code, and readable logs. Every build that followed was bound
+by it (it ships in the repo as `constitution.md`).
 
-*(screenshot: Reflections card)*
-
-## The security constitution
-
-Phase 1 of the challenge: custom instructions in AI Studio that act as a
-constitution for every build. Mine assumes hostile browsers, ID-guessing
-users, public source code, and readable logs. The rules that followed:
+**Phase 2 — the build.** A single FastAPI container on Cloud Run serving
+both the API and the UI:
 
 - **Auth everywhere.** Every endpoint verifies the Firebase ID token
   server-side (issuer, audience, expiry). The uid used for storage comes
-  *only* from the verified token — never from the request.
-- **Structural isolation.** All Firestore paths are rooted at
-  `users/{uid}/…`. Cross-user reads aren't filtered out; they're impossible
-  to express. Client-side Firestore access is denied entirely — the only
-  path to data is the authenticated API.
-- **No secrets in code.** The Gemini API key lives in Secret Manager,
-  fetched at runtime by a service account holding exactly three roles.
-- **Fail closed.** Verification failure means an error, never a degraded
+  *only* from the verified token — never from the request body.
+- **Structural isolation.** Every Firestore path is rooted at
+  `users/{uid}/…`. Cross-user reads aren't filtered out — they're
+  impossible to express. Client-side Firestore access is denied entirely.
+- **No secrets in code.** The Gemini API key is fetched at runtime from
+  Secret Manager by a least-privilege service account (exactly three roles).
+- **Fail closed.** Verification failure returns an error — never a degraded
   anonymous mode.
 
-The full constitution ships in the repo.
+The journaling flow: chat with Gemini through your day; one click on **Save
+entry** has Gemini distill the conversation into a structured entry —
+summary, one-word mood, theme tags — persisted to your own Firestore subtree.
 
-## The stack
+**Phase 3 — the original feature: 🪞 Reflections.** Journals store your
+words; Reflections reads them back to you. Gemini analyzes your recent
+entries and returns the **3 most recurring themes** (with reasons), a
+**mood trend** across time, and **one caring insight** you probably hadn't
+noticed. In testing it caught something real: *"periods of relief are brief
+before new pressures emerge — you may not be allowing full recovery."*
+That's what a good friend notices.
 
-| Piece | Role |
-|---|---|
-| Firebase Authentication | email/password sign-in, ID tokens |
-| Gemini API | chat, structured summarization, Reflections |
-| Cloud Firestore | per-user isolated entries |
-| Secret Manager | runtime key retrieval |
-| Cloud Run | one container, API + UI, scales to zero |
+## 🏁 Result
 
-One FastAPI container. The browser holds only the public Firebase client key
-and the user's own token.
+A working, production-grade app — live on Cloud Run, scaling to zero:
 
-## What I learned
+- **Live app:** https://gemini-journal-716080261877.us-east1.run.app
+- **Code + constitution:** https://github.com/bhartiya75/gemini-journal
+
+*(screenshot: sign-in and chat)*
+
+*(screenshot: the Reflections card)*
+
+All four core requirements verified end-to-end: unauthenticated requests are
+rejected (401), multi-turn context carries across the conversation, every
+entry lands in the caller's own isolated subtree, and the key never appears
+in code, logs, or git history.
+
+**What stayed with me:**
 
 1. **Write the constitution first.** Security directives before code changed
-   what the code looked like — auth verification wasn't bolted on, it was
-   the skeleton.
-2. **`hidden` loses to `display:flex`.** My sign-in gate stayed painted over
-   a working app because an explicit CSS display beats the HTML `hidden`
-   attribute. One `[hidden]{display:none!important}` later, all was well.
-3. **Structural isolation beats filtered isolation.** If the uid comes from
-   the token and the path starts at `users/{uid}`, there is no query a user
-   can make that touches someone else's journal.
+   the shape of the code — verification wasn't bolted on, it was the skeleton.
+2. **Structural isolation beats filtered isolation.** When the uid comes from
+   the verified token and every path starts at `users/{uid}`, there is no
+   query a user can write that touches someone else's journal.
+3. **Ship the boring controls.** Secret Manager, least-privilege IAM,
+   fail-closed errors — none of it is glamorous, and all of it is the
+   difference between a demo and a product.
 
----
+Grateful to **Google Cloud** and **Hack2skill** for a program that insisted
+on production discipline, not just prompts.
 
-*Gen AI Academy APAC Cohort 3 · built on Google Cloud*
-*#AccelerateAIwithCloudRun*
+*#AccelerateAIwithCloudRun #GoogleCloud #GenAI #CloudRun #Gemini #Firebase*
