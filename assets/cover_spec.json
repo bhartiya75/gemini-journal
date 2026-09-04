@@ -1,0 +1,13 @@
+{
+  "kicker": "Google Cloud Gen AI Academy APAC  ·  Ideathon Challenge",
+  "headline": ["A journal that reads", "you back to yourself"],
+  "sub": ["Firebase Auth · Gemini · Firestore · Secret Manager · Cloud Run",
+          "Built under a security constitution, not a demo script."],
+  "rows": [
+    ["01", "The verified token is the only source of identity"],
+    ["02", "users/{uid}/… — isolation by structure, not by filter"],
+    ["03", "Reflections: recurring themes, mood trend, one insight"]
+  ],
+  "note": "#AccelerateAIwithCloudRun  ·  github.com/bhartiya75/gemini-journal",
+  "footer_right": "AI Transformation Sales and Alliance Leader, APAC"
+}
