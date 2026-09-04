@@ -30,6 +30,7 @@ log = logging.getLogger("journal")
 PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT", "genai-academy-c3-357d")
 SECRET_NAME = os.environ.get("GEMINI_SECRET", "gemini-api-key")
 MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+FALLBACK_MODEL = os.environ.get("GEMINI_FALLBACK_MODEL", "gemini-2.5-flash-lite")
 
 MAX_TURNS = 20          # conversation turns sent to the model
 MAX_MESSAGE_CHARS = 4000
@@ -43,6 +44,54 @@ SYSTEM_DIRECTIVES = (
     "or payment details. If the user reports intent to harm themselves or "
     "others, respond with care and suggest professional support resources."
 )
+
+
+def _parse_json(text: str | None):
+    """Tolerate fenced or prose-wrapped JSON — models drift even in JSON mode."""
+    import json
+    import re
+
+    if not text:
+        return None
+    t = text.strip()
+    if t.startswith("```"):
+        t = re.sub(r"^```(?:json)?\s*|\s*```$", "", t, flags=re.S).strip()
+    try:
+        return json.loads(t)
+    except json.JSONDecodeError:
+        pass
+    m = re.search(r"\{.*\}", t, re.S)
+    if m:
+        try:
+            return json.loads(m.group(0))
+        except json.JSONDecodeError:
+            return None
+    return None
+
+
+def _generate_json(prompt: str, attempts: int = 3) -> dict | None:
+    """Structured Gemini call with parse tolerance and backoff on transient errors."""
+    import time
+
+    last = "no attempt"
+    models = [MODEL, FALLBACK_MODEL] if FALLBACK_MODEL != MODEL else [MODEL]
+    for i in range(attempts):
+        model = models[min(i, len(models) - 1)]  # last attempt(s) use the fallback
+        try:
+            result = genai_client.models.generate_content(
+                model=model,
+                contents=prompt,
+                config={"response_mime_type": "application/json"},
+            )
+            data = _parse_json(result.text)
+            if isinstance(data, dict):
+                return data
+            last = "unparseable model output"
+        except Exception as err:  # noqa: BLE001
+            last = f"{type(err).__name__}: {str(err)[:160]}"
+        log.warning("Gemini JSON call attempt %d/%d failed: %s", i + 1, attempts, last)
+        time.sleep(1.5 * (i + 1))
+    return None
 
 
 def _load_gemini_key() -> str | None:
@@ -140,7 +189,7 @@ def chat(payload: ChatIn, uid: str = Depends(current_uid)):
         )
         reply = (result.text or "").strip() or "I'm here — tell me more?"
     except Exception as err:  # noqa: BLE001
-        log.error("Gemini call failed: %s", type(err).__name__)
+        log.error("Gemini call failed: %s: %s", type(err).__name__, str(err)[:160])
         raise HTTPException(status_code=502, detail="The journal assistant is unavailable right now.")
 
     batch = db.batch()
@@ -167,17 +216,11 @@ def save_entry(uid: str = Depends(current_uid)):
         '"summary" (2-3 sentences, second person), "mood" (one word), '
         '"themes" (array of 1-3 short lowercase tags). Transcript:\n' + transcript
     )
-    try:
-        result = genai_client.models.generate_content(
-            model=MODEL,
-            contents=prompt,
-            config={"response_mime_type": "application/json"},
-        )
-        import json
-
-        data = json.loads(result.text)
-    except Exception:  # noqa: BLE001
-        data = {"summary": transcript[:400], "mood": "reflective", "themes": ["journal"]}
+    data = _generate_json(prompt)
+    if data is None:
+        # Degrade gracefully: keep the user's own words, never the raw transcript.
+        user_text = " ".join(t["text"] for t in turns if t.get("role") == "user")
+        data = {"summary": user_text[:400], "mood": "reflective", "themes": ["journal"]}
 
     entry = {
         "summary": str(data.get("summary", ""))[:1500],
@@ -238,16 +281,8 @@ def reflections(uid: str = Depends(current_uid)):
         '"insight" (one caring, specific observation the writer may not have '
         "noticed, max 50 words). Entries:\n" + digest
     )
-    try:
-        result = genai_client.models.generate_content(
-            model=MODEL,
-            contents=prompt,
-            config={"response_mime_type": "application/json"},
-        )
-        import json
-
-        data = json.loads(result.text)
-    except Exception:  # noqa: BLE001
+    data = _generate_json(prompt)
+    if data is None:
         raise HTTPException(status_code=502, detail="Reflections unavailable right now.")
     data["ready"] = True
     data["entries_analyzed"] = len(entries)
