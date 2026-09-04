@@ -7,7 +7,7 @@ Sign in, talk through your day with Gemini, save the conversation as a
 summarized journal entry — and let **Reflections** surface the patterns you
 didn't notice: recurring themes, your mood trend, and one caring insight.
 
-**Live app:** https://gemini-journal-716080261877.us-central1.run.app
+**Live app:** https://gemini-journal-716080261877.us-east1.run.app
 
 ## How the required services are used
 
